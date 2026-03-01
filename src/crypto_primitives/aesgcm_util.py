@@ -1,7 +1,6 @@
-"""
-todo:
-    implement encryption and decryption functions for bytes data which uses normal aes256
-"""
+#
+# Helper functions for encrypting using aes-gcm with an optional envelope (aead)
+#
 
 from __future__ import annotations
 
@@ -12,11 +11,12 @@ from cryptography.hazmat.primitives.ciphers.modes import GCM as _GCM
 from cryptography.hazmat.backends.openssl.backend import backend as _B
 
 
-def encryptData(DEK: bytes, D: bytes):
+def encrypt_data(DEK: bytes, D: bytes, *, context_info: bytes = b""):
     """
     Encrypts bytestring data using a dek (or really any 32 byte key)
     :param DEK: a key of size 32 bytes
     :param D: plaintext data.
+    :param context_info: context information for a complete envelope, not mandatory.
     :return: encrypted data in format tuple[ciphertext, tag, nonce]
     """
     if not isinstance(DEK, bytes):
@@ -31,16 +31,20 @@ def encryptData(DEK: bytes, D: bytes):
 
     cipherObj = _C(_AES(DEK), _GCM(initialization_vector=Q), _B).encryptor()  # initialize
 
+    cipherObj.authenticate_additional_data(context_info)
+
     ciphertext = cipherObj.update(D) + cipherObj.finalize()
     tag = cipherObj.tag
+
     return ciphertext, tag, Q
 
 
-def decryptData(DEK: bytes, D: tuple[bytes, bytes, bytes]):
+def decrypt_data(DEK: bytes, D: tuple[bytes, bytes, bytes], *, context_info: bytes = b""):
     """
     Decrypts encrypted data from format tuple[ciphertext, tag, nonce]
     :param DEK: a key of size 32 bytes
     :param D: encrypted data in format tuple[ciphertext, tag, nonce]
+    :param context_info: context information for a complete envelope, not mandatory.
     :return: plaintext
     """
 
@@ -57,6 +61,9 @@ def decryptData(DEK: bytes, D: tuple[bytes, bytes, bytes]):
     ciphertext, tag, nonce = D
 
     cipherObj = _C(_AES(DEK), _GCM(initialization_vector=nonce, tag=tag), _B).decryptor()
+
+    cipherObj.authenticate_additional_data(context_info)
+
     plaintext = cipherObj.update(ciphertext) + cipherObj.finalize()
 
     return plaintext

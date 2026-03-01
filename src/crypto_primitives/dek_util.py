@@ -1,6 +1,6 @@
 #
 # Native implementation of the PBKDF2 -> HKDF -> AEAD, DEK wrapping.
-# found in docs: `databaseIntegratedUserInterface/userDataHandling/__init__.py/`
+# found in docs: `pg-serve/src/crypto_primitives/docs_v0.0.txt/`
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from cryptography.hazmat.backends.openssl.backend import backend as _B
 
 def S(P: bytes, B: bytes):  # PBKDF2 based secret derivation, through reliable secret `P`.
     """
-    find docs in databaseIntegratedUserInterface/userDataHandling/__init__.py/
+    find docs in `pg-serve/src/crypto_primitives/docs_v0.0.txt/`
     :param B: salt, required. must be at least 32 bytes.
     :param P: password to be asserted through row n
     :return: tuple[secret, salt] (salt is the same as inputted through parameters.)
@@ -35,14 +35,14 @@ def S(P: bytes, B: bytes):  # PBKDF2 based secret derivation, through reliable s
 # Table key serves as context binder, might add more in the DEK encryption stage or here, not sure yet.
 # for now, there's enough context, since this system here sits after the auth and tokenization.
 # noinspection PyShadowingNames
-def rowRelativeHKDF(S: tuple[bytes, bytes], TableK: bytes, *, contextInfo: bytes = b""):
+def table_relative_HKDF(S: tuple[bytes, bytes], TableK: bytes, *, contextInfo: bytes = b""):
     """
-        find docs in databaseIntegratedUserInterface/userDataHandling/__init__.py/
-        :param contextInfo: Optional additional context from primary key column row. asserted into HKDF.
-        :param TableK: table key, context binder.
-        :param S: row specific secret, derived from pbkdf2 of this protocol (above).
-        :return: tuple[KEK, salt, TableK+contextInfo] (salt carried from S)
-        """
+    find docs in `pg-serve/src/crypto_primitives/docs_v0.0.txt/`
+    :param contextInfo: Optional additional context from primary key column row. asserted into HKDF.
+    :param TableK: table key, context binder.
+    :param S: row specific secret, derived from pbkdf2 of this protocol (above).
+    :return: tuple[KEK, salt, TableK+contextInfo] (salt carried from S)
+    """
     # Parameter Validation
     if not isinstance(S, tuple):
         raise TypeError("Invalid Secret Type.")
@@ -64,9 +64,9 @@ def rowRelativeHKDF(S: tuple[bytes, bytes], TableK: bytes, *, contextInfo: bytes
     return T, S2, TableK+contextInfo  # salt and context preservation
 
 
-def wrapDek(dek: bytes, KEK_HKDF: tuple[bytes, bytes, bytes]):
+def wrap_dek(dek: bytes, KEK_HKDF: tuple[bytes, bytes, bytes]):
     """
-    find docs in databaseIntegratedUserInterface/userDataHandling/__init__.py/
+    find docs in `pg-serve/src/crypto_primitives/docs_v0.0.txt/`
     :param dek: random pre - generated dek
     :param KEK_HKDF: KEK, as a tuple composed in the HKDF function.
     :return: <wrappedDek>$<tag>$<nonce>$<salt> (salt carried from HKDF)
@@ -95,7 +95,7 @@ def wrapDek(dek: bytes, KEK_HKDF: tuple[bytes, bytes, bytes]):
 
 
 # helper function
-def constructKekFromPayload(P: bytes, wrappedDek: bytes, TableK: bytes, *, contextInfo: bytes = b""):
+def construct_kek_from_wrapped_dek(P: bytes, wrappedDek: bytes, TableK: bytes, *, contextInfo: bytes = b""):
     if not isinstance(wrappedDek, bytes):
         raise TypeError("Invalid Data Encryption Key Type.")
 
@@ -113,12 +113,12 @@ def constructKekFromPayload(P: bytes, wrappedDek: bytes, TableK: bytes, *, conte
 
     _, _, _, B = wrappedDek.split(b"$")
 
-    return rowRelativeHKDF(S(P, B), TableK, contextInfo=contextInfo)
+    return table_relative_HKDF(S(P, B), TableK, contextInfo=contextInfo)
 
 
-def unwrapDek(wrappedDek: bytes, KEK_HKDF: tuple[bytes, bytes, bytes]):
+def unwrap_dek(wrappedDek: bytes, KEK_HKDF: tuple[bytes, bytes, bytes]):
     """
-    find docs in databaseIntegratedUserInterface/userDataHandling/__init__.py/
+    find docs in `pg-serve/src/crypto_primitives/docs_v0.0.txt/`
     :param wrappedDek: wrapped dek with all its parameters, as
     :param KEK_HKDF: KEK, as a tuple composed in the HKDF function.
     :return: tuple[dek, salt] (original salt from S)

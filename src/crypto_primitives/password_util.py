@@ -1,6 +1,6 @@
 #
 # Password authentication and password hashing helper functions
-# found in docs: `pg-serve/userDataHandling/__init__.py/`
+# found in docs: `pg-serve/src/crypto_primitives/docs_v0.0.txt/`
 
 
 from nacl.pwhash.argon2id import (str as _argon2id,
@@ -9,9 +9,9 @@ from nacl.pwhash.argon2id import (str as _argon2id,
                                   verify as _V)
 
 
-def hashPassword(P: bytes):
+def hash_password(P: bytes):
     """
-    find docs in pg-serve/userDataHandling/__init__.py/
+    find docs in `pg-serve/src/crypto_primitives/docs_v0.0.txt/`
     :param P: Raw password as bytes.
     :return: hash
     """
@@ -23,7 +23,7 @@ def hashPassword(P: bytes):
 
 def authPassword(P: bytes, H: bytes):
     """
-    find docs in pg-serve/userDataHandling/__init__.py/
+    find docs in `pg-serve/src/crypto_primitives/docs_v0.0.txt/`
     :param P: Raw password as bytes.
     :param H: Password hash as stored in database (digested from function above.)
     :return: True or False.
@@ -39,6 +39,6 @@ def authPassword(P: bytes, H: bytes):
 
 
 if __name__ == "__main__":
-    print(hashPassword(b'hello im password'))
-    print(str(b'hello im password'))
-    print(authPassword(b'hello im password', str(b'hello im password')))
+    print(hash_password(b'hello im password'))
+    print(_argon2id(b'hello im password'))
+    print(authPassword(b'hello im password', _argon2id(b'hello im password')))
