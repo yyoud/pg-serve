@@ -1,6 +1,6 @@
 #
 # Password authentication and password hashing helper functions
-# found in docs: `databaseIntegratedUserInterface/userDataHandling/__init__.py/`
+# found in docs: `pg-serve/userDataHandling/__init__.py/`
 
 
 from nacl.pwhash.argon2id import (str as _argon2id,
@@ -11,7 +11,7 @@ from nacl.pwhash.argon2id import (str as _argon2id,
 
 def hashPassword(P: bytes):
     """
-    find docs in databaseIntegratedUserInterface/userDataHandling/__init__.py/
+    find docs in pg-serve/userDataHandling/__init__.py/
     :param P: Raw password as bytes.
     :return: hash
     """
@@ -23,7 +23,7 @@ def hashPassword(P: bytes):
 
 def authPassword(P: bytes, H: bytes):
     """
-    find docs in databaseIntegratedUserInterface/userDataHandling/__init__.py/
+    find docs in pg-serve/userDataHandling/__init__.py/
     :param P: Raw password as bytes.
     :param H: Password hash as stored in database (digested from function above.)
     :return: True or False.
