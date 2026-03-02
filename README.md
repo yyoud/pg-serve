@@ -3,7 +3,7 @@
 </h1>
 
 
-<div style="text-align:center;">
+<div align="center">
   <img src="/images/pg-serve_logo.svg" alt="pg-serve logo" height="300"/>
 </div>
 
@@ -13,7 +13,7 @@ PG-Serve is a crypto-security focused python server API that recieves input via 
 ---
 
 ## Features
-- KEK derivition from passwords
+- KEK derivation from passwords
 - DEK envelope wrapping
 - Per-column data encryption envelope
 - Session management
