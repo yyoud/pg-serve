@@ -1,15 +1,31 @@
-# pg-serve
+<h1 align="center">
+    pg-serve
+</h1>
+
+
+<div style="text-align:center;">
+  <img src="/images/pg-serve_logo2.svg" alt="pg-serve logo" height="300"/>
+</div>
+
+
 PG-Serve is a crypto-security focused python server API that recieves input via HTTP/JSON, and interacts with a PosrgreSQL database.
+
+---
 
 ## Features
 - KEK derivition from passwords
 - DEK envelope wrapping
 - Per-column data encryption envelope
-- Encrypted socket connections
+- Session management
 
 ## Goal
- This project comes to teach myself how servers, databases, pipelines, and connections really behave in practice.
- It isn't the most polished, readable, or correct code ever, but it comes as a proof of concept. 
- I myself enjoy developing and learning, thus I always aspire for improvement. 
- Frankly, I hope this just lets you see who I am and how I code.
- As of current version, this is completely unfinished, but i am developing it currently, and I hope that until june I will finish baseline development.
+This project is a proof-of-concept to learn how servers, databases, and secure pipelines really work. 
+It’s a work in progress - code may be rough, but I’m constantly improving. 
+Goal: finish baseline development by June.
+
+## Licence
+This project is licenced under the [MIT licence](https://opensource.org/licenses/MIT).
+
+---
+
+![pg-serve app flow diagram](/images/pg-serve_app_diagram.png)
