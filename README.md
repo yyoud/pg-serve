@@ -4,7 +4,7 @@
 
 
 <div style="text-align:center;">
-  <img src="/images/pg-serve_logo2.svg" alt="pg-serve logo" height="300"/>
+  <img src="/images/pg-serve_logo.svg" alt="pg-serve logo" height="300"/>
 </div>
 
 
