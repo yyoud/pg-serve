@@ -1,6 +1,6 @@
 #
 # Password authentication and password hashing helper functions
-# found in docs: `pg-serve/src/crypto_primitives/docs_v0.0.txt/`
+# found in docs: `pg-serve/src/crypto_primitives/crypto_docs_v0.0.txt/`
 
 
 from nacl.pwhash.argon2id import (str as _argon2id,
@@ -11,7 +11,7 @@ from nacl.pwhash.argon2id import (str as _argon2id,
 
 def hash_password(P: bytes):
     """
-    find docs in `pg-serve/src/crypto_primitives/docs_v0.0.txt/`
+    find docs in `pg-serve/docs/SECURITY_ARCHITECTURE.md/#2-password-hash-function---argon2id`
     :param P: Raw password as bytes.
     :return: hash
     """
@@ -23,7 +23,7 @@ def hash_password(P: bytes):
 
 def authPassword(P: bytes, H: bytes):
     """
-    find docs in `pg-serve/src/crypto_primitives/docs_v0.0.txt/`
+    find docs in `pg-serve/docs/SECURITY_ARCHITECTURE.md/#2-password-hash-function---argon2id`
     :param P: Raw password as bytes.
     :param H: Password hash as stored in database (digested from function above.)
     :return: True or False.
@@ -36,9 +36,3 @@ def authPassword(P: bytes, H: bytes):
         raise TypeError("Invalid Salt.")
 
     return _V(H, P)
-
-
-if __name__ == "__main__":
-    print(hash_password(b'hello im password'))
-    print(_argon2id(b'hello im password'))
-    print(authPassword(b'hello im password', _argon2id(b'hello im password')))

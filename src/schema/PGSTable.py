@@ -5,7 +5,8 @@ Goals:
     and then process the information and insert it into the db. now i already know how to do the first part.
 
 todo:
-    -- finish defining PGSTable, with
+    -- finish defining PGSTable
+    -- et cetera.
 """
 from os import urandom
 from typing import Any
@@ -38,10 +39,14 @@ class PGSTable(Table):
                         f"Column '{i.name}' must be String/VARCHAR to be encrypted, "
                         f"not {type(i.type).__name__}"
                     )
+
         self._table = super().__init__(name, metadata, *args, **kw)
-        self._table.append_column()
+
         self.encrypted_columns = ecrypted_columns
         self.tableKey = urandom(32)
+
+        # dict of password column, session token (JWT), timestamp, expiration columns -- from kwargs.
+        # {"pw": <col name>, "st": <col name>, "
 
 
 def ensure_column(engine, table_name, column_name, column_type):

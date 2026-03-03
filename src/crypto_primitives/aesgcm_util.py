@@ -2,10 +2,8 @@
 # Helper functions for encrypting using aes-gcm with an optional envelope (aead)
 #
 
-from __future__ import annotations
-
-from os import urandom
-from cryptography.hazmat.primitives.ciphers.algorithms import AES as _AES
+from os import urandom as _urand
+from cryptography.hazmat.primitives.ciphers.algorithms import AES256 as _AES
 from cryptography.hazmat.primitives.ciphers.base import Cipher as _C
 from cryptography.hazmat.primitives.ciphers.modes import GCM as _GCM
 from cryptography.hazmat.backends.openssl.backend import backend as _B
@@ -13,6 +11,7 @@ from cryptography.hazmat.backends.openssl.backend import backend as _B
 
 def encrypt_data(DEK: bytes, D: bytes, *, context_info: bytes = b""):
     """
+    find docs in `pg-serve/docs/SECURITY_ARCHITECTURE.md/#3-data-encryption`
     Encrypts bytestring data using a dek (or really any 32 byte key)
     :param DEK: a key of size 32 bytes
     :param D: plaintext data.
@@ -27,7 +26,7 @@ def encrypt_data(DEK: bytes, D: bytes, *, context_info: bytes = b""):
     if not isinstance(D, bytes):
         raise TypeError("Invalid Data Type.")
 
-    Q = urandom(12)  # nonce, generated each encryption session.
+    Q = _urand(12)  # nonce, generated each encryption session.
 
     cipherObj = _C(_AES(DEK), _GCM(initialization_vector=Q), _B).encryptor()  # initialize
 
@@ -41,6 +40,7 @@ def encrypt_data(DEK: bytes, D: bytes, *, context_info: bytes = b""):
 
 def decrypt_data(DEK: bytes, D: tuple[bytes, bytes, bytes], *, context_info: bytes = b""):
     """
+    find docs in `pg-serve/docs/SECURITY_ARCHITECTURE.md/#3-data-encryption`
     Decrypts encrypted data from format tuple[ciphertext, tag, nonce]
     :param DEK: a key of size 32 bytes
     :param D: encrypted data in format tuple[ciphertext, tag, nonce]

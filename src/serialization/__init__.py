@@ -6,7 +6,7 @@ Goal:
 
 **Sign up request flow:**
 
-1. receive input from client via HTTP / JSON -- initialize session (including a token).
+1. receive input from client via HTTP / JSON
 
 2. parse it using parsers
 
@@ -22,23 +22,28 @@ Goal:
 
 5. commit change via postgres (with transaction wrap), return positive feedback to client.
 
-6. end session (via expiration of token), discard session token (or store in a separate table, provide both options).
+6. create payload dict, issue a session token.
 
 ----
 
 **Log-in / Modify request flow:**
 
-1. Receive input via HTTP/JSON and initialize session (token if needed).
+1. Receive input via HTTP/JSON
 
 2. Authenticate user via password (update last-auth timestamp on stored hash).
 
-3. Parse request parameters:
-   - Require authorization via a totp sent to email (if column exists), otherwise do not authorize.
+3. create payload dict and issue a session token.
+
+4. Parse request's parameters:
+   - Require authorization via a totp sent to email/phone (if column exists, if both offer the options to the client or otherwise default to email),
+    otherwise do not authorize.
    - Require password rephrase upon updating columns marked "encrypted", or password column (also used to initialize encryption by unwrapping dek).
 
-4. Execute requested action in DB (wrapped in transaction).
+5. Execute requested action in DB (wrapped in transaction).
 
-5. Return feedback (success/failure) to client and end session.
+6. Return feedback (success/failure) to client and go on to the next request.
+
+7. end session, either via expiration of the token, or by connection loss to the client.
 
 ----
 

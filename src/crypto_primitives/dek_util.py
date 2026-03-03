@@ -1,12 +1,10 @@
 #
 # Native implementation of the PBKDF2 -> HKDF -> AEAD, DEK wrapping.
-# found in docs: `pg-serve/src/crypto_primitives/docs_v0.0.txt/`
+# found in docs: `pg-serve/src/crypto_primitives/crypto_docs_v0.0.txt/`
 
-from __future__ import annotations
-
-from os import urandom
+from os import urandom as _urand
 from hashlib import pbkdf2_hmac as _pbkdf2
-from cryptography.hazmat.primitives.ciphers.algorithms import AES as _AES
+from cryptography.hazmat.primitives.ciphers.algorithms import AES256 as _AES  # identical to regular AES, only accepts 256-bit keys.
 from cryptography.hazmat.primitives.ciphers.base import Cipher as _C
 from cryptography.hazmat.primitives.ciphers.modes import GCM as _GCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF as _HKDF
@@ -16,9 +14,9 @@ from cryptography.hazmat.backends.openssl.backend import backend as _B
 
 def S(P: bytes, B: bytes):  # PBKDF2 based secret derivation, through reliable secret `P`.
     """
-    find docs in `pg-serve/src/crypto_primitives/docs_v0.0.txt/`
-    :param B: salt, required. must be at least 32 bytes.
-    :param P: password to be asserted through row n
+    find docs in `pg-serve/docs/SECURITY_ARCHITECTURE.md/#1-kek--dek-generation`
+    :param B: salt, required. must be at least 16 bytes.
+    :param P: Raw password represented in bytes.
     :return: tuple[secret, salt] (salt is the same as inputted through parameters.)
     """
     if not isinstance(P, bytes):
@@ -26,7 +24,7 @@ def S(P: bytes, B: bytes):  # PBKDF2 based secret derivation, through reliable s
 
     if not isinstance(B, bytes):
         raise TypeError("Invalid Salt Type.")
-    if not B or len(B) < 32:
+    if not B or len(B) < 16:
         raise ValueError("Invalid Salt.")
 
     return _pbkdf2('sha3_256', password=P, salt=B, iterations=262144), B
@@ -37,7 +35,7 @@ def S(P: bytes, B: bytes):  # PBKDF2 based secret derivation, through reliable s
 # noinspection PyShadowingNames
 def table_relative_HKDF(S: tuple[bytes, bytes], TableK: bytes, *, contextInfo: bytes = b""):
     """
-    find docs in `pg-serve/src/crypto_primitives/docs_v0.0.txt/`
+    find docs in `pg-serve/docs/SECURITY_ARCHITECTURE.md/#1-kek--dek-generation`
     :param contextInfo: Optional additional context from primary key column row. asserted into HKDF.
     :param TableK: table key, context binder.
     :param S: row specific secret, derived from pbkdf2 of this protocol (above).
@@ -66,8 +64,10 @@ def table_relative_HKDF(S: tuple[bytes, bytes], TableK: bytes, *, contextInfo: b
 
 def wrap_dek(dek: bytes, KEK_HKDF: tuple[bytes, bytes, bytes]):
     """
-    find docs in `pg-serve/src/crypto_primitives/docs_v0.0.txt/`
-    :param dek: random pre - generated dek
+    find docs in:
+     `pg-serve/docs/SECURITY_ARCHITECTURE.md/#11-dek-wrapping-using-the-kek`, \n
+     `pg-serve/docs/SECURITY_ARCHITECTURE.md/#1-kek--dek-generation`
+    :param dek: random pre-generated dek
     :param KEK_HKDF: KEK, as a tuple composed in the HKDF function.
     :return: <wrappedDek>$<tag>$<nonce>$<salt> (salt carried from HKDF)
     """
@@ -81,7 +81,7 @@ def wrap_dek(dek: bytes, KEK_HKDF: tuple[bytes, bytes, bytes]):
         raise ValueError("Invalid DEK.")
 
     kek, B, AD = KEK_HKDF
-    Q = urandom(12)  # nonce, generated each encryption session.
+    Q = _urand(12)  # nonce, generated each encryption session.
 
     cipherObj = _C(_AES(kek), _GCM(initialization_vector=Q), _B).encryptor()  # initialize
 
@@ -96,6 +96,14 @@ def wrap_dek(dek: bytes, KEK_HKDF: tuple[bytes, bytes, bytes]):
 
 # helper function
 def construct_kek_from_wrapped_dek(P: bytes, wrappedDek: bytes, TableK: bytes, *, contextInfo: bytes = b""):
+    """
+    Helper function to help construct a KEK tuple from the password, the wrapped dek and the bounded context.
+    :param P: Raw password represented in bytes.
+    :param wrappedDek: Given wrapped DEK as a bytestring formatted ``<wrappedDek>$<tag>$<nonce>$<salt>``
+    :param TableK:
+    :param contextInfo:
+    :return:
+    """
     if not isinstance(wrappedDek, bytes):
         raise TypeError("Invalid Data Encryption Key Type.")
 
@@ -118,7 +126,7 @@ def construct_kek_from_wrapped_dek(P: bytes, wrappedDek: bytes, TableK: bytes, *
 
 def unwrap_dek(wrappedDek: bytes, KEK_HKDF: tuple[bytes, bytes, bytes]):
     """
-    find docs in `pg-serve/src/crypto_primitives/docs_v0.0.txt/`
+    find docs in `pg-serve/docs/SECURITY_ARCHITECTURE.md/#11-dek-wrapping-using-the-kek`
     :param wrappedDek: wrapped dek with all its parameters, as
     :param KEK_HKDF: KEK, as a tuple composed in the HKDF function.
     :return: tuple[dek, salt] (original salt from S)
