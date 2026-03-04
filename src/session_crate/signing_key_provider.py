@@ -4,6 +4,7 @@ from typing import Union
 import os as _os
 from pathlib import Path as _Path
 from base64 import urlsafe_b64decode as _url_b64d
+from src.util.exceptions import SigningKeyError
 
 
 class _SigningKeyProvider:
@@ -61,3 +62,6 @@ def provide_signing_key(var_name: str = None, path: str = None):
 
     if path:
         return PEMSigningKeyProvider(path).get_key()
+
+    if not var_name and not path:
+        raise SigningKeyError("At least one Option shall be given to fetch signing key.")

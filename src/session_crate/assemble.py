@@ -1,9 +1,3 @@
-"""
-todo:
-    -- create payload json from user id (provided via the auth process, where id is matched and password hashes compared)
-    -- create
-"""
-
 from typing import Union
 from json import dumps, loads
 from base64 import urlsafe_b64encode as _url_b64e, urlsafe_b64decode as _url_b64d
@@ -13,7 +7,7 @@ from hmac import new as _new
 
 def assemble_payload(subject: Union[str, int], issued_at: int, expires: int):
     """
-    assemble payload dictonary for JWT.
+    assemble payload dictionary for JWT.
     find docs at `pg-serve/docs/SECURITY_ARCHITECTURE.md/#session-token`
     :param subject: user id, claimed from database via auth process
     :param issued_at: unix timestamp of assembly time (in seconds)

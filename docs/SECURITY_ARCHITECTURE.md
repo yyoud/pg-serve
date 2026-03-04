@@ -44,6 +44,8 @@ The key will be formatted as: `<header>`**.**`<payload>`**.**`<signature>`.
 A random, 256-bit key, used to sign the payload in the session token. The key can be loaded from an environment variable, 
 and a .PEM file.
 
+It shall be rotated frequently, though it is not enforced because of the environment limitations.
+
 ...
 
 ---
@@ -54,23 +56,30 @@ and a .PEM file.
 
 
 ### 1. KEK & DEK generation
-A KEK will be generated as thus:
-1. Put the raw password into a PBKDF2 process, along with a pre-generated salt of at least 16 bytes.
+#### A KEK will be generated as thus:
+1. Stretching -- Put the raw password into a PBKDF2 process, along with a random pre-generated salt of 128 bits.
    (see function [S(P, B)](https://github.com/yyoud/pg-serve/blob/main/src/crypto_primitives/dek_util.py/#L17-L32)).
-   The function uses the `SHA3-256` algorithm
-   The function returns a tuple `(S1, S2)` (where `S1` is the secret itself - not stored; `S2` is the salt, kept and stored.).
+   The function uses the `SHA3-256` algorithm, as well as 262144 iterations.
+   The function returns a tuple `(S1, S2)` (where `S1` is the secret itself - not permanently stored; `S2` is the salt, kept and stored.).
 
-2. The output will on-go into an HKDF, where it will be mandatorily context-bound to the table key, and optionally bound to additional context
+2. Expansion -- The output will on-go into an HKDF, where it will be mandatorily context-bound to the table key, 
+   and optionally bound to additional context
    (value of [PRIMARY KEY](https://docs.sqlalchemy.org/en/20/glossary.html#term-primary-key) column). 
    The HKDF also uses `S2` as a salt, in order to decrease the amount of random variables needed to be kept.
    The HKDF returns as a tuple `(KEK, S2, context)` (where `context` is the concatenation of `table key`+`optinal context`)
 
+This process is an implementation of the [NIST SP 800-132](https://csrc.nist.gov/News/2023/proposal-to-revise-nist-sp-800-132-pbkdf)
+recommendation for Password-Based Key Derivation. (see [SP 800-132, december 2010, section 5.4](https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-132.pdf/)).
+
 The tuple returned by the HKDF needs to be passed as is to the dek wrapping function.
 
+##
 
-A dek is generated using [`os.urandom(32)`](https://docs.python.org/3/library/os.html#os.urandom).
+#### A dek 
+is generated using [`os.urandom(32)`](https://docs.python.org/3/library/os.html#os.urandom).
 The specific length of 32 bytes (256 bits) is needed for the AES-256 algorithm to work properly.
 
+---
 
 ### 1.1. DEK wrapping using the KEK
 The DEK is encrypted by [AES-256](https://cryptography.io/en/latest/hazmat/primitives/symmetric-encryption/#cryptography.hazmat.primitives.ciphers.algorithms.AES256) 
@@ -82,10 +91,14 @@ It is preserving the random variables it got from past stages, to reconstruct th
 Thus, it is formatted as a `$` separated bytestring, for more compact database assertion.
 It is formatted like so: `<wrapped-dek>$<tag>$<nonce>$<S2>`.
 
+---
+
 ### 2. Password hash function - Argon2id
 The used password hash fucntion in this API is [PyNaCl Argon2id](https://pynacl.readthedocs.io/en/latest/api/pwhash/#nacl.pwhash.str).
 The constants (`MEMLIMIT`, `OPSLIMIT`) are by default set to [`MEMLIMIT INTERACTIVE`](https://pynacl.readthedocs.io/en/latest/api/pwhash/#nacl.pwhash.MEMLIMIT_INTERACTIVE)
 and [`OPSLIMIT INTERACTIVE`](https://pynacl.readthedocs.io/en/latest/api/pwhash/#nacl.pwhash.OPSLIMIT_INTERACTIVE).
+
+---
 
 ### 3. Data encryption
 This library can encrypt certain data before it is stored in database.
@@ -128,10 +141,3 @@ The general model on which the security architecture is guided and built upon.
 3. No data recoverability -- If the user loses the password, all the encrypted data is lost. This is the case because unfortunately 
    I do not have the right equipment (HSM) for handling/implementing the appropriate key hierarchy needed for that. <a id="known-limitation-data-loss"></a>
 4. Physical/Mental attacks ($5 wrench attack) are out of scope.
-
-
-## Attack Vectors and Mitigations
-
-### 1. 
-...
-
