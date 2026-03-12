@@ -1,14 +1,12 @@
-<h1 align="center">
-    pg-serve
-</h1>
+<p align="center">
+  <img src="docs/images/pg-serve_logo.svg" width="200">
+</p>
 
+<h1 align="center">pg-serve</h1>
 
-<div align="center">
-  <img src="docs/images/pg-serve_logo.svg" alt="pg-serve logo" height="300"/>
-</div>
-
-
-PG-Serve is a crypto-security focused python server API that recieves input via HTTP/JSON, and interacts with a PosrgreSQL database.
+<p align="center">
+Crypto-security focused Python API server for PostgreSQL
+</p>
 
 ---
 
