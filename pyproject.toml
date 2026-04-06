@@ -1,0 +1,11 @@
+[project]
+name = "pg-serve"
+version = "0.1.0"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "typer",
+]
+
+[project.scripts]
+pgserve = "cli.command:cli_app"

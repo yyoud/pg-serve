@@ -1,11 +1,11 @@
 #
 # Native implementation of the PBKDF2 -> HKDF -> AEAD, DEK wrapping.
-# found in docs: `pg-serve/src/crypto_primitives/crypto_docs_v0.0.txt/`
+# found in docs: `pg-serve/src/primitives/crypto_docs_v0.0.txt/`
 
 from os import urandom as _urand
 from hashlib import pbkdf2_hmac as _pbkdf2
 from cryptography.hazmat.primitives.ciphers.algorithms import AES256 as _AES  # identical to regular AES, only accepts 256-bit keys.
-from cryptography.hazmat.primitives.ciphers.base import Cipher as _C
+from cryptography.hazmat.primitives.ciphers.base import Cipher as _Cipher
 from cryptography.hazmat.primitives.ciphers.modes import GCM as _GCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF as _HKDF
 from cryptography.hazmat.primitives.hashes import SHA3_256 as _SHA3_256
@@ -32,20 +32,19 @@ def S(P: bytes, B: bytes):  # PBKDF2 based secret derivation, through reliable s
 
 # Table key serves as context binder, might add more in the DEK encryption stage or here, not sure yet.
 # for now, there's enough context, since this system here sits after the auth and tokenization.
-# noinspection PyShadowingNames
-def table_relative_HKDF(S: tuple[bytes, bytes], TableK: bytes, *, contextInfo: bytes = b""):
+def HKDF(secret: tuple[bytes, bytes], TableK: bytes, *, contextInfo: bytes = b""):
     """
     find docs in `pg-serve/docs/SECURITY_ARCHITECTURE.md/#1-kek--dek-generation`
     :param contextInfo: Optional additional context from primary key column row. asserted into HKDF.
     :param TableK: table key, context binder.
-    :param S: row specific secret, derived from pbkdf2 of this protocol (above).
+    :param secret: row specific secret, derived from pbkdf2 of this protocol (above).
     :return: tuple[KEK, salt, TableK+contextInfo] (salt carried from S)
     """
     # Parameter Validation
-    if not isinstance(S, tuple):
+    if not isinstance(secret, tuple):
         raise TypeError("Invalid Secret Type.")
 
-    if len(S) != 2:
+    if len(secret) != 2:
         raise ValueError("Invalid Secret.")
 
     if not isinstance(TableK, (bytes, bytearray)):
@@ -54,7 +53,7 @@ def table_relative_HKDF(S: tuple[bytes, bytes], TableK: bytes, *, contextInfo: b
     if not TableK:
         raise ValueError("TableK must be non-empty bytes.")
 
-    S1, S2 = S
+    S1, S2 = secret
 
     # HKDF
     T = _HKDF(_SHA3_256(), 32, S2, TableK+contextInfo, backend=_B).derive(S1)
@@ -69,7 +68,7 @@ def wrap_dek(dek: bytes, KEK_HKDF: tuple[bytes, bytes, bytes]):
      `pg-serve/docs/SECURITY_ARCHITECTURE.md/#1-kek--dek-generation`
     :param dek: random pre-generated dek
     :param KEK_HKDF: KEK, as a tuple composed in the HKDF function.
-    :return: <wrappedDek>$<tag>$<nonce>$<salt> (salt carried from HKDF)
+    :return: <wrappedDek> || <tag> || <nonce> || <salt> (salt carried from HKDF)
     """
     if not isinstance(KEK_HKDF, tuple):
         raise TypeError("Invalid HKDF Type.")
@@ -83,15 +82,25 @@ def wrap_dek(dek: bytes, KEK_HKDF: tuple[bytes, bytes, bytes]):
     kek, B, AD = KEK_HKDF
     Q = _urand(12)  # nonce, generated each encryption session.
 
-    cipherObj = _C(_AES(kek), _GCM(initialization_vector=Q), _B).encryptor()  # initialize
+    cipherObj = _Cipher(_AES(kek), _GCM(initialization_vector=Q), _B).encryptor()  # initialize
 
     cipherObj.authenticate_additional_data(AD)  # AAD
 
     wrappedDek = cipherObj.update(dek) + cipherObj.finalize()
     tag = cipherObj.tag
 
-    # for now, returns as a `$` separated byte string for more compact DB assertion, though not optimal.
-    return b'$'.join((wrappedDek, tag, Q, B))  # *important: preserve past random variables
+    return b''.join((wrappedDek, tag, Q, B))  # *important: preserve past random variables
+
+
+def split_wrapped_dek(wrappedDek: bytes):
+    """
+    Helper function to split a wrapped dek by part length.
+
+    :param wrappedDek: wrapped dek.
+
+    :return: tuple[wrapped dek, tag, nonce, salt]
+    """
+    return wrappedDek[:32], wrappedDek[32:48], wrappedDek[48:60], wrappedDek[60:]
 
 
 # helper function
@@ -107,9 +116,6 @@ def construct_kek_from_wrapped_dek(P: bytes, wrappedDek: bytes, TableK: bytes, *
     if not isinstance(wrappedDek, bytes):
         raise TypeError("Invalid Data Encryption Key Type.")
 
-    if len(wrappedDek.split(b"$")) != 4:
-        raise ValueError("Invalid Data Encryption Key.")
-
     if not isinstance(TableK, (bytes, bytearray)):
         raise TypeError("Invalid Table Key Type.")
 
@@ -119,9 +125,9 @@ def construct_kek_from_wrapped_dek(P: bytes, wrappedDek: bytes, TableK: bytes, *
     if not isinstance(P, bytes):
         raise TypeError("Invalid Parameter Type.")
 
-    _, _, _, B = wrappedDek.split(b"$")
+    _, _, _, B = split_wrapped_dek(wrappedDek)
 
-    return table_relative_HKDF(S(P, B), TableK, contextInfo=contextInfo)
+    return HKDF(S(P, B), TableK, contextInfo=contextInfo)
 
 
 def unwrap_dek(wrappedDek: bytes, KEK_HKDF: tuple[bytes, bytes, bytes]):
@@ -134,14 +140,11 @@ def unwrap_dek(wrappedDek: bytes, KEK_HKDF: tuple[bytes, bytes, bytes]):
     if not isinstance(wrappedDek, bytes):
         raise TypeError("Invalid Data Encryption Key Type.")
 
-    if len(wrappedDek.split(b"$")) != 4:
-        raise ValueError("Invalid Data Encryption Key.")
-
-    wrappedDek, tag, nonce, salt = wrappedDek.split(b"$")
+    wrappedDek, tag, nonce, salt = split_wrapped_dek(wrappedDek)
 
     kek, _, AD = KEK_HKDF
 
-    cipherObj = _C(_AES(kek), _GCM(initialization_vector=nonce, tag=tag), _B).decryptor()
+    cipherObj = _Cipher(_AES(kek), _GCM(initialization_vector=nonce, tag=tag), _B).decryptor()
 
     cipherObj.authenticate_additional_data(AD)
 

@@ -33,10 +33,10 @@ and eradicated upon expiration or end of the connection.
 The session is identified via a JWT session token, which expires after a set amount of time.
 
 ### Session token:
-A JWT session token is the authentication card all packed up. it is assembled from the following parts, all encoded in [URL-safe base 64](https://docs.python.org/3/library/base64.html#base64.urlsafe_b64encode):
-1. Payload -- A json file containing "sub" (subject, user id), "iat" (issued at, timestamp of issue in secs), "exp" (timestamp of expiration in secs).
+A JWT session token is the authentication signature. it is assembled from the following parts, all encoded in [base 64](https://docs.python.org/3/library/base64.html#base64.b64encode):
+1. Payload -- A JSON file containing "sub" (subject, user id), "iat" (issued at, timestamp of issue in secs), "exp" (timestamp of expiration in secs).
 2. Signature -- An HMAC digest of the payload and header separated by a `.`, with a secret key.
-3. Header -- A json file containing "alg" (algorithm used for signature), "typ" (type of token, defaults to "JWT").
+3. Header -- A JSON file containing "alg" (algorithm used for signature), "typ" (type of token, defaults to "JWT").
 
 The key will be formatted as: `<header>`**.**`<payload>`**.**`<signature>`.
 
@@ -59,8 +59,9 @@ It shall be rotated frequently, though it is not enforced because of the environ
 #### A KEK will be generated as thus:
 1. Stretching -- Put the raw password into a PBKDF2 process, along with a random pre-generated salt of 128 bits.
    (see function [S(P, B)](https://github.com/yyoud/pg-serve/blob/main/src/crypto_primitives/dek_util.py/#L17-L32)).
-   The function uses the `SHA3-256` algorithm, as well as 262144 iterations.
-   The function returns a tuple `(S1, S2)` (where `S1` is the secret itself - not permanently stored; `S2` is the salt, kept and stored.).
+   The function uses the `SHA3-256` algorithm, as well as 262144 (2^18) iterations.
+   The function returns a tuple `(S1, S2)` (where `S1` is the secret itself - not permanently stored; `S2` is the salt, kept and stored
+   in the wrapped DEK).
 
 2. Expansion -- The output will on-go into an HKDF, where it will be mandatorily context-bound to the table key, 
    and optionally bound to additional context
@@ -69,7 +70,7 @@ It shall be rotated frequently, though it is not enforced because of the environ
    The HKDF returns as a tuple `(KEK, S2, context)` (where `context` is the concatenation of `table key`+`optinal context`)
 
 This process is an implementation of the [NIST SP 800-132](https://csrc.nist.gov/News/2023/proposal-to-revise-nist-sp-800-132-pbkdf)
-recommendation for Password-Based Key Derivation. (see [SP 800-132, december 2010, section 5.4](https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-132.pdf/)).
+recommendation for Password-Based Key Derivation. (see [SP 800-132, december 2010, section 5.4, option 2b](https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-132.pdf)).
 
 The tuple returned by the HKDF needs to be passed as is to the dek wrapping function.
 
@@ -88,8 +89,7 @@ It uses the KEK as the key, and a [random 96-bit nonce](https://cryptography.io/
 generated via os.urandom(12).
 
 It is preserving the random variables it got from past stages, to reconstruct the KEK at decryption.
-Thus, it is formatted as a `$` separated bytestring, for more compact database assertion.
-It is formatted like so: `<wrapped-dek>$<tag>$<nonce>$<S2>`.
+Thus, it is formatted as a length based partition, as the wrapped key is stored encoded into base 64 in the database.
 
 ---
 
@@ -120,11 +120,12 @@ The general model on which the security architecture is guided and built upon.
 1. Runtime is trusted -- We assume no memory leaks/dumps from RAM, no access to internal memory at all by an attacker.  <a id="assumption-runtime-trusted"></a>
 2. Database is not trusted -- Database environment is considered exploited/visible to an attacker at all times.
 3. Primitives are trusted -- All the used Cryptography primitives are implemented correctly and audited.
-4. Client side is not exploited -- The client's computer does not contain any malicious software that may grant full/part access to the computer for an attacker.
-5. Encrypted protocols are trusted -- HTTPS & TLS are assumed to be secure connections with proper encryption and authentication (MAC).
-6. Client connection is secure -- Assume HTTPS/TLS are used, thus making the connection encrypted and secure.
-7. Server Physically protected -- Server is not accessible to unauthorized personnel.
-8. Client is not under physical attack -- Assume no attacker beats the client with a wrench for the password .
+4. Client itself not trusted -- Client assumed to be a potential attacker.
+5. Client side is not exploited -- The client's computer does not contain any malicious software that may grant full/part access to the computer for an attacker.
+6. Encrypted protocols are trusted -- HTTPS & TLS are assumed to be secure connections with proper encryption and authentication (MAC).
+7. Client connection is secure -- Assume HTTPS/TLS are used, thus making the connection encrypted and secure.
+8. Server Physically protected -- Server is not accessible to unauthorized personnel.
+9. Client is not under physical attack -- Assume no attacker beats the client with a wrench for the password .
 
 
 ### Protected threats

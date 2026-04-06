@@ -1,6 +1,6 @@
 #
 # Password authentication and password hashing helper functions
-# found in docs: `pg-serve/src/crypto_primitives/crypto_docs_v0.0.txt/`
+# found in docs: `pg-serve/src/primitives/crypto_docs_v0.0.txt/`
 
 
 from nacl.pwhash.argon2id import (str as _argon2id,
