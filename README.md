@@ -33,4 +33,3 @@ This project is licenced under the [MIT license](LICENSE).
 <p align="center">
     <img src="docs/images/pgserve_interface_img.svg" width="596" alt="pg-serve interface diagram">
 </p>
-![pg-serve interface diagram](/docs/images/pgserve_interface_img.svg)
